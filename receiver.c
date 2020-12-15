@@ -46,12 +46,15 @@ void fill_outgoing_frames(LLnode ** outgoing_frames_head_ptr, Frame * inframe, u
 	}
 	free(outgoingframe);
 }
-void window_move(Receiver * receiver, int src_id)
+void receiver_window_move(Receiver * receiver, int src_id)
 {
     int i;
     for (i = 0; i < 8; i++) {
         if (receiver->swp[src_id].window_flag[i] == 0) {
             break;
+        }
+        else {
+            receiver->swp[src_id].window_flag[i] = 0;
         }
     }
     receiver->swp[src_id].left_frame_no = (receiver->swp[src_id].left_frame_no + i) % SEQ_MAX;
@@ -73,14 +76,14 @@ int check_incoming_msgs(LLnode ** outgoing_frames_head_ptr, Frame * inframe, Rec
         return 0;
     }
     //不是自己的直接返回0
-    if (inframe->header.number != receiver->recv_id)
+    if (inframe->header.dst_id != receiver->recv_id)
     {
         return 0;
     }
     //在窗口内的发ACK帧
-    if (inframe->header.number >= receiver->swp[inframe->header.src_id].left_frame_no && inframe->header.number <= receiver->swp[inframe->header.src_id].right_frame_no)
+    if ((inframe->header.number - receiver->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX <= MAX_WINDOW_SIZE - 1)
     {
-        int biass = inframe->header.number - receiver->swp[inframe->header.src_id].left_frame_no + SEQ_MAX % SEQ_MAX;
+        int biass = (inframe->header.number - receiver->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX;
         receiver->swp[inframe->header.src_id].window_flag[biass] = 1;
         fill_outgoing_frames(outgoing_frames_head_ptr, inframe, 1);
         return 1;
@@ -107,7 +110,6 @@ void handle_incoming_msgs(Receiver * receiver,
     {
         //Pop a node off the front of the link list and update the count
         LLnode * ll_inmsg_node = ll_pop_node(&receiver->input_framelist_head);
-        incoming_msgs_length = ll_get_length(receiver->input_framelist_head);
 
         //DUMMY CODE: Print the raw_char_buf
         //NOTE: You should not blindly print messages!
@@ -124,7 +126,7 @@ void handle_incoming_msgs(Receiver * receiver,
             free(ll_inmsg_node);
             continue;
         }
-        window_move(receiver, inframe->header.src_id);
+        receiver_window_move(receiver, inframe->header.src_id);
         //Free raw_char_buf
         free(raw_char_buf);
         
@@ -132,6 +134,8 @@ void handle_incoming_msgs(Receiver * receiver,
 
         free(inframe);
         free(ll_inmsg_node);
+
+        incoming_msgs_length = ll_get_length(receiver->input_framelist_head);
     }
 }
 

@@ -148,7 +148,18 @@ void print_frame(Frame * frame, char * str)
           frame->crc
            );
 }
-
+void print_window(SlidingWindow * swp, char * str) {
+    fprintf(stderr, "%s window:[%d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s]\n", 
+    str,
+    swp->left_frame_no, (swp->window_flag[0] ? "*" : " "), 
+    (swp->left_frame_no + 1) % 8, (swp->window_flag[1] ? "*" : " "), 
+    (swp->left_frame_no + 2) % 8, (swp->window_flag[2] ? "*" : " "), 
+    (swp->left_frame_no + 3) % 8, (swp->window_flag[3] ? "*" : " "), 
+    (swp->left_frame_no + 4) % 8, (swp->window_flag[4] ? "*" : " "), 
+    (swp->left_frame_no + 5) % 8, (swp->window_flag[5] ? "*" : " "), 
+    (swp->left_frame_no + 6) % 8, (swp->window_flag[6] ? "*" : " "), 
+    (swp->left_frame_no + 7) % 8, (swp->window_flag[7] ? "*" : " "));
+}
 char * convert_frame_to_char(Frame * frame)
 {
     //TODO: You should implement this as necessary

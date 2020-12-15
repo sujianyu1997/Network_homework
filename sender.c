@@ -27,7 +27,10 @@ void init_sender(Sender * sender, int receivers, int id)
 
     }
 }
-
+void reset_timer(Sender * sender, int bias1, int bias2) {
+    sender->expiring_timeval[bias1][bias2].tv_sec = 0;
+    sender->expiring_timeval[bias1][bias2].tv_usec = 0;
+}
 //获取该发送者的最早超时的时间
 struct timeval * sender_get_next_expiring_timeval(Sender * sender)
 {
@@ -50,22 +53,63 @@ struct timeval * sender_get_next_expiring_timeval(Sender * sender)
     }
 }
 
-void window_move(Sender * sender, int rec_id)
+void sender_window_move(Sender * sender, int rec_id)
 {
+    if (sender->swp[rec_id].window_flag[0] == 0) {
+        return;
+    }
+    char tmp[1024];
+    sprintf(tmp, "Sender_%d-Receiver_%d: ", sender->send_id, rec_id);
+    print_window(&sender->swp[rec_id], tmp);
     int i;
     for (i = 0; i < 8; i++) {
         if (sender->swp[rec_id].window_flag[i] == 0) {
             break;
         }
+        else {
+            sender->swp[rec_id].window_flag[i] = 0;
+            reset_timer(sender, rec_id, i);
+        }
     }
     sender->swp[rec_id].left_frame_no = (sender->swp[rec_id].left_frame_no + i) % SEQ_MAX;
     sender->swp[rec_id].right_frame_no = (sender->swp[rec_id].right_frame_no + i) % SEQ_MAX;
+    print_window(&sender->swp[rec_id], tmp);
 }
 
-void reset_timer(Sender * sender, Frame * frame) {
-    int bias = (frame->header.number - sender->swp[frame->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX;
-    sender->expiring_timeval[frame->header.src_id][bias].tv_sec = 0;
-    sender->expiring_timeval[frame->header.src_id][bias].tv_usec = 0;
+
+int check_incoming_acks(LLnode ** outgoing_frames_head_ptr,
+			   Frame * inframe, Sender * sender)
+{
+    unsigned char crc = inframe->crc;
+    inframe->crc = 0;
+    //检测损坏
+    if (crc != crc16((unsigned char *)inframe, MAX_FRAME_SIZE))
+    {
+        char tmp[1024];
+        sprintf(tmp, "Sender_%d收到的ack或nak帧损坏: ", sender->send_id);
+        print_frame(inframe, tmp);
+        return 0;
+    }
+    //不是自己的直接返回0
+    if (inframe->header.dst_id != sender->send_id)
+    {
+        return 0;
+    }
+    if ((inframe->header.number - sender->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX <= MAX_WINDOW_SIZE - 1)
+    {
+        int bias = (inframe->header.number - sender->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX;
+        //如果是ack则把对应的帧的flag置为1
+        if (inframe->header.flag == 1) {
+            sender->swp[inframe->header.src_id].window_flag[bias] = 1;
+            return 1;
+        }
+        //如果收到nak帧则设置一个超时的帧，例如(1, 1)
+        else if (inframe->header.flag == 2) {
+            sender->expiring_timeval[inframe->header.src_id][bias].tv_sec = 1;
+            sender->expiring_timeval[inframe->header.src_id][bias].tv_usec = 1;
+        }
+        
+    }
 }
 void handle_incoming_acks(Sender * sender,
                           LLnode ** outgoing_frames_head_ptr)
@@ -79,10 +123,37 @@ void handle_incoming_acks(Sender * sender,
     int incoming_acks_length = ll_get_length(sender->input_framelist_head);
     while (incoming_acks_length > 0)                                    //此函数会从有消息一直干到没消息
     {
-        
+        LLnode * ll_inmsg_node = ll_pop_node(&sender->input_framelist_head);
+
+        //DUMMY CODE: Print the raw_char_buf
+        //NOTE: You should not blindly print messages!
+        //      Ask yourself: Is this message really for me?
+        //                    Is this message corrupted?
+        //                    Is this an old, retransmitted message?           
+        char * raw_char_buf = (char *) ll_inmsg_node->value;
+        Frame * inframe = convert_char_to_frame(raw_char_buf);
+
+        if (!check_incoming_msgs(outgoing_frames_head_ptr, inframe, sender))
+        {
+            free(raw_char_buf);
+            free(inframe);
+            free(ll_inmsg_node);
+            continue;
+        }
+        sender_window_move(sender, inframe->header.src_id);
+        incoming_acks_length = ll_get_length(sender->input_framelist_head);
     }
 }
-
+int locate_available_window(Sender * sender, int rec_id) {
+    int i, index = -1;
+    for (i = 0; i < MAX_WINDOW_SIZE; i++) {
+        if (sender->swp[rec_id].window_flag[i] == 0) {
+            index = i;
+            return index;
+        }
+    }
+    return index;
+}
 
 void handle_input_cmds(Sender * sender,
                        LLnode ** outgoing_frames_head_ptr)
@@ -107,7 +178,13 @@ void handle_input_cmds(Sender * sender,
         //Cast to Cmd type and free up the memory for the node
         Cmd * outgoing_cmd = (Cmd *) ll_input_cmd_node->value;
         free(ll_input_cmd_node);
-            
+        
+        int index = locate_available_window(sender, outgoing_cmd->dst_id);
+        //说明发送窗口没位置了，把命令重新入队
+        if (index == -1) {
+            ll_append_node(&sender->input_cmdlist_head, (void *) outgoing_cmd);
+            continue;
+        }
 
         //DUMMY CODE: Add the raw char buf to the outgoing_frames list
         //NOTE: You should not blindly send this message out!

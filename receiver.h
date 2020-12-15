@@ -21,7 +21,7 @@ void init_receiver(Receiver *, int, int);
 void to_network_layer(char * str, int id);
 void fill_outgoing_frames(LLnode ** outgoing_frames_head_ptr, Frame * inframe,  
 		     unsigned char flag);
-void window_move(Receiver * receiver, int src_id);
+void receiver_window_move(Receiver * receiver, int src_id);
 int check_incoming_msgs(LLnode ** outgoing_frames_head_ptr,
 			   Frame * inframe, Receiver * receiver);
 void * run_receiver(void *);
