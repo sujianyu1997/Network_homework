@@ -31,6 +31,7 @@ long timeval_usecdiff(struct timeval *,
 char * convert_frame_to_char(Frame *);
 Frame * convert_char_to_frame(char *);
 void print_frame(Frame * frame, char * str);
-void print_window(SlidingWindow * swp, char * str);
+void sender_print_window(Sender * sender, int rec_id, char * str);
+void receiver_print_window(Receiver * receiver, int send_id, char * str);
 unsigned short int crc16(unsigned char *ptr, unsigned int len) ;
 #endif

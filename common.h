@@ -140,6 +140,7 @@ struct Sender_t //发送者结构体
 	int receivers; //一个发送者需要处理的者数量，因为是广播式
 	SlidingWindow * swp;//滑动窗口结构体数组
     struct timeval (*expiring_timeval)[MAX_WINDOW_SIZE];
+    unsigned char (*ack_flag)[MAX_WINDOW_SIZE];
 };
 
 

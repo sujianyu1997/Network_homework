@@ -18,7 +18,7 @@
 
 
 void init_sender(Sender *, int, int);
-void reset_timer(Sender * sender, int bias1, int bias2);
+void reset_timer(Sender * sender, int bias1, int bias2, long int sec, unsigned long int usec);
 void sender_window_move(Sender * sender, int rec_id);
 int check_incoming_acks(LLnode ** outgoing_frames_head_ptr,
 			   Frame * inframe, Sender * sender);

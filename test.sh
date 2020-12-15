@@ -34,8 +34,8 @@ echo
 
 
 ## Test Case 1
-echo -n "Test case 1: Sending 1 packet and expecting receiver to print it out: "
-(sleep 0.5; echo "msg 0 0 Hello world"; sleep 0.5; echo "exit") | ./datalink -r 1 -s 1
+echo -n "Test case 2: Sending 10 packets and expecting receiver to print them out in order: "
+(sleep 0.5; for i in `seq 0 9`; do echo "msg 5 1 Packet: $i"; sleep 0.1; done; sleep 1; echo "exit") | ./datalink -s 10 -r 10
 
 
 

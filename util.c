@@ -148,29 +148,58 @@ void print_frame(Frame * frame, char * str)
           frame->crc
            );
 }
-void print_window(SlidingWindow * swp, char * str) {
-    fprintf(stderr, "%s window:[%d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s]\n", 
+void sender_print_window(Sender * sender, int rec_id, char * str) {
+    SlidingWindow * swp = &sender->swp[rec_id];
+    fprintf(stderr, "%s window:[%d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s] \t", 
     str,
-    swp->left_frame_no, (swp->window_flag[0] ? "*" : " "), 
-    (swp->left_frame_no + 1) % 8, (swp->window_flag[1] ? "*" : " "), 
-    (swp->left_frame_no + 2) % 8, (swp->window_flag[2] ? "*" : " "), 
-    (swp->left_frame_no + 3) % 8, (swp->window_flag[3] ? "*" : " "), 
-    (swp->left_frame_no + 4) % 8, (swp->window_flag[4] ? "*" : " "), 
-    (swp->left_frame_no + 5) % 8, (swp->window_flag[5] ? "*" : " "), 
-    (swp->left_frame_no + 6) % 8, (swp->window_flag[6] ? "*" : " "), 
-    (swp->left_frame_no + 7) % 8, (swp->window_flag[7] ? "*" : " "));
+    swp->left_frame_no, (swp->window_flag[0] ? "*" : " "), (sender->ack_flag[rec_id][0] ? "D" : " "), 
+    (swp->left_frame_no + 1) % SEQ_MAX, (swp->window_flag[1] ? "*" : " "), (sender->ack_flag[rec_id][1] ? "D" : " "), 
+    (swp->left_frame_no + 2) % SEQ_MAX, (swp->window_flag[2] ? "*" : " "), (sender->ack_flag[rec_id][2] ? "D" : " "), 
+    (swp->left_frame_no + 3) % SEQ_MAX, (swp->window_flag[3] ? "*" : " "), (sender->ack_flag[rec_id][3] ? "D" : " "), 
+    (swp->left_frame_no + 4) % SEQ_MAX, (swp->window_flag[4] ? "*" : " "), (sender->ack_flag[rec_id][4] ? "D" : " "), 
+    (swp->left_frame_no + 5) % SEQ_MAX, (swp->window_flag[5] ? "*" : " "), (sender->ack_flag[rec_id][5] ? "D" : " "), 
+    (swp->left_frame_no + 6) % SEQ_MAX, (swp->window_flag[6] ? "*" : " "), (sender->ack_flag[rec_id][6] ? "D" : " "), 
+    (swp->left_frame_no + 7) % SEQ_MAX, (swp->window_flag[7] ? "*" : " "), (sender->ack_flag[rec_id][7] ? "D" : " "));
+
+    struct timeval    curr_timeval;
+    gettimeofday(&curr_timeval, 
+                     NULL);
+    fprintf(stderr, "window_left_time(ms):[%.2lf, %.2lf, %.2lf, %.2lf, %.2lf, %.2lf, %.2lf, %.2lf]\n", 
+    sender->swp[rec_id].window_flag[0] == 0 ? 0 : (sender->expiring_timeval[rec_id][0].tv_sec - curr_timeval.tv_sec) *1000 + (double)(sender->expiring_timeval[rec_id][0].tv_usec - curr_timeval.tv_usec) / 1000,
+    sender->swp[rec_id].window_flag[1] == 0 ? 0 : (sender->expiring_timeval[rec_id][1].tv_sec - curr_timeval.tv_sec) *1000 + (double)(sender->expiring_timeval[rec_id][1].tv_usec - curr_timeval.tv_usec) / 1000,
+    sender->swp[rec_id].window_flag[2] == 0 ? 0 : (sender->expiring_timeval[rec_id][2].tv_sec - curr_timeval.tv_sec) *1000 + (double)(sender->expiring_timeval[rec_id][2].tv_usec - curr_timeval.tv_usec) / 1000,
+    sender->swp[rec_id].window_flag[3] == 0 ? 0 : (sender->expiring_timeval[rec_id][3].tv_sec - curr_timeval.tv_sec) *1000 + (double)(sender->expiring_timeval[rec_id][3].tv_usec - curr_timeval.tv_usec) / 1000,
+    sender->swp[rec_id].window_flag[4] == 0 ? 0 : (sender->expiring_timeval[rec_id][4].tv_sec - curr_timeval.tv_sec) *1000 + (double)(sender->expiring_timeval[rec_id][4].tv_usec - curr_timeval.tv_usec) / 1000,
+    sender->swp[rec_id].window_flag[5] == 0 ? 0 : (sender->expiring_timeval[rec_id][5].tv_sec - curr_timeval.tv_sec) *1000 + (double)(sender->expiring_timeval[rec_id][5].tv_usec - curr_timeval.tv_usec) / 1000,
+    sender->swp[rec_id].window_flag[6] == 0 ? 0 : (sender->expiring_timeval[rec_id][6].tv_sec - curr_timeval.tv_sec) *1000 + (double)(sender->expiring_timeval[rec_id][6].tv_usec - curr_timeval.tv_usec) / 1000,
+    sender->swp[rec_id].window_flag[7] == 0 ? 0 : (sender->expiring_timeval[rec_id][7].tv_sec - curr_timeval.tv_sec) *1000 + (double)(sender->expiring_timeval[rec_id][7].tv_usec - curr_timeval.tv_usec) / 1000
+    );
+}
+
+void receiver_print_window(Receiver * receiver, int send_id, char * str) {
+    SlidingWindow * swp = &receiver->swp[send_id];
+    fprintf(stderr, "%s window:[%d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s] \n", 
+    str,
+    swp->left_frame_no, (swp->window_flag[0] ? "*" : " "),
+    (swp->left_frame_no + 1) % SEQ_MAX, (swp->window_flag[1] ? "*" : " "),
+    (swp->left_frame_no + 2) % SEQ_MAX, (swp->window_flag[2] ? "*" : " "),
+    (swp->left_frame_no + 3) % SEQ_MAX, (swp->window_flag[3] ? "*" : " "),
+    (swp->left_frame_no + 4) % SEQ_MAX, (swp->window_flag[4] ? "*" : " "),
+    (swp->left_frame_no + 5) % SEQ_MAX, (swp->window_flag[5] ? "*" : " "),
+    (swp->left_frame_no + 6) % SEQ_MAX, (swp->window_flag[6] ? "*" : " "),
+    (swp->left_frame_no + 7) % SEQ_MAX, (swp->window_flag[7] ? "*" : " "));
 }
 char * convert_frame_to_char(Frame * frame)
 {
     //TODO: You should implement this as necessary
-    char * char_buffer = (char *) malloc(MAX_FRAME_SIZE);
+    char * char_buffer = (char *) malloc(sizeof(Frame));
     memset(char_buffer,
            0,
-           MAX_FRAME_SIZE);
+           sizeof(Frame));
 	//小改动，frame->data改成了frame，因为添加了新的变量
     memcpy(char_buffer, 
            frame,
-           FRAME_PAYLOAD_SIZE);
+           sizeof(Frame));
     return char_buffer;
 }
 
@@ -182,11 +211,11 @@ Frame * convert_char_to_frame(char * char_buf)
 	//初始化
     memset(frame,
            0,
-           MAX_FRAME_SIZE);
+           sizeof(Frame));
 	//和上一个函数对应，直接用memcpy就行了
     memcpy(frame, 
            char_buf,
-           MAX_FRAME_SIZE);
+           sizeof(Frame));
     return frame;
 }
 
