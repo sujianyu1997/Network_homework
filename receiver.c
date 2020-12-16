@@ -63,6 +63,8 @@ void receiver_window_move(Receiver * receiver, int src_id)
     }
     receiver->swp[src_id].left_frame_no = (receiver->swp[src_id].left_frame_no + i) % SEQ_MAX;
     receiver->swp[src_id].right_frame_no = (receiver->swp[src_id].right_frame_no + i) % SEQ_MAX;
+    unsigned char zero = 0;
+    left_loop(receiver->swp[src_id].window_flag, &zero, MAX_WINDOW_SIZE, i, sizeof(unsigned char));
     sprintf(tmp, "Receiver_%d-Sender_%d(after): ", receiver->recv_id, src_id);
     receiver_print_window(receiver, src_id, tmp);
 }
@@ -74,7 +76,7 @@ int check_incoming_msgs(LLnode ** outgoing_frames_head_ptr, Frame * inframe, Rec
 {
     unsigned short int crc = inframe->crc;
     inframe->crc = 0;
-    
+    print_frame(inframe, "");
     //损坏发NAK帧
     if (crc != crc16((unsigned char *)inframe, MAX_FRAME_SIZE))
     {
@@ -92,7 +94,8 @@ int check_incoming_msgs(LLnode ** outgoing_frames_head_ptr, Frame * inframe, Rec
     {
         int biass = (inframe->header.number - receiver->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX;
         receiver->swp[inframe->header.src_id].window_flag[biass] = 1;
-        receiver->swp[inframe->header.src_id].buffer[biass] = *inframe;
+        memcpy(&receiver->swp[inframe->header.src_id].buffer[biass], inframe, sizeof(Frame));
+        //receiver->swp[inframe->header.src_id].buffer[biass] = *inframe;
         fill_outgoing_frames(outgoing_frames_head_ptr, inframe, 1);
         return 1;
     }

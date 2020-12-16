@@ -66,7 +66,7 @@ void sender_window_move(Sender * sender, int rec_id)
     sender_print_window(sender, rec_id, tmp);
     int i;
     for (i = 0; i < 8; i++) {
-        if (sender->swp[rec_id].window_flag[i] == 0) {
+        if (sender->ack_flag[rec_id][i] == 0) {
             break;
         }
         else {
@@ -79,6 +79,12 @@ void sender_window_move(Sender * sender, int rec_id)
     sender->swp[rec_id].right_frame_no = (sender->swp[rec_id].right_frame_no + i) % SEQ_MAX;
     sprintf(tmp, "Sender_%d-Receiver_%d(after): ", sender->send_id, rec_id);
     sender_print_window(sender, rec_id, tmp);
+    unsigned char zero = 0;
+    left_loop(sender->swp[rec_id].window_flag, &zero, MAX_WINDOW_SIZE, i, sizeof(unsigned char));
+    struct timeval time_z;
+    time_z.tv_sec = 0;
+    time_z.tv_usec = 0;
+    left_loop(sender->ack_flag[rec_id], &time_z, MAX_WINDOW_SIZE, i, sizeof(unsigned char));
 }
 
 
