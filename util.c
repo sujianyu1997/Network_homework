@@ -111,8 +111,22 @@ long timeval_usecdiff(struct timeval *start_time,
   usec+=(finish_time->tv_usec- start_time->tv_usec);
   return usec;
 }
-
-
+//循环左移
+void left_loop (void * p, void * tmp, int n, int k, int size)
+{
+    int i, j;
+    for (j = 0; j < k; j++)
+    {
+        for (i = 0; i < n - 1; i++)
+        {
+            memcpy((p + i * size), (p + (i + 1) * size), size);
+        }
+    }
+    for (i = n - k; i < n; i++)
+    {
+        memcpy((p + i * size), tmp, size);
+    }
+}
 //Print out messages entered by the user
 void print_cmd(Cmd * cmd)
 {

@@ -30,6 +30,7 @@ long timeval_usecdiff(struct timeval *,
 //TODO: Implement these functions
 char * convert_frame_to_char(Frame *);
 Frame * convert_char_to_frame(char *);
+void left_loop (void * p, void * tmp, int n, int k, int size);
 void print_frame(Frame * frame, char * str);
 void sender_print_window(Sender * sender, int rec_id, char * str);
 void receiver_print_window(Receiver * receiver, int send_id, char * str);
