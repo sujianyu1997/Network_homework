@@ -55,12 +55,8 @@ struct timeval * sender_get_next_expiring_timeval(Sender * sender)
         return &sender->expiring_timeval[index1][index2];
     }
 }
-
 void sender_window_move(Sender * sender, int rec_id)
 {
-    if (sender->swp[rec_id].window_flag[0] == 0) {
-        return;
-    }
     char tmp[1024];
     sprintf(tmp, "Sender_%d-Receiver_%d(before): ", sender->send_id, rec_id);
     sender_print_window(sender, rec_id, tmp);
@@ -69,22 +65,27 @@ void sender_window_move(Sender * sender, int rec_id)
         if (sender->ack_flag[rec_id][i] == 0) {
             break;
         }
-        else {
-            sender->swp[rec_id].window_flag[i] = 0;
-            sender->ack_flag[rec_id][i] = 0;
-            reset_timer(sender, rec_id, i, 0, 0);
-        }
     }
     sender->swp[rec_id].left_frame_no = (sender->swp[rec_id].left_frame_no + i) % SEQ_MAX;
     sender->swp[rec_id].right_frame_no = (sender->swp[rec_id].right_frame_no + i) % SEQ_MAX;
-    sprintf(tmp, "Sender_%d-Receiver_%d(after): ", sender->send_id, rec_id);
-    sender_print_window(sender, rec_id, tmp);
     unsigned char zero = 0;
+    
     left_loop(sender->swp[rec_id].window_flag, &zero, MAX_WINDOW_SIZE, i, sizeof(unsigned char));
+    // for (int i = 0; i < 8; i++) {
+    //     fprintf(stderr, "%d ", sender->swp[rec_id].window_flag[i]);
+    // }
+    // fprintf(stderr, "\n");
     struct timeval time_z;
     time_z.tv_sec = 0;
     time_z.tv_usec = 0;
-    left_loop(sender->ack_flag[rec_id], &time_z, MAX_WINDOW_SIZE, i, sizeof(unsigned char));
+    left_loop(sender->ack_flag[rec_id], &zero, MAX_WINDOW_SIZE, i, sizeof(unsigned char));
+    Frame tmp_f;
+    left_loop(sender->swp[rec_id].buffer, &tmp_f, MAX_WINDOW_SIZE, i, sizeof(Frame));
+
+    left_loop(sender->expiring_timeval[rec_id], &time_z, MAX_WINDOW_SIZE, i, sizeof(struct timeval));
+    
+    sprintf(tmp, "Sender_%d-Receiver_%d(after): ", sender->send_id, rec_id);
+    sender_print_window(sender, rec_id, tmp);
 }
 
 
@@ -96,8 +97,13 @@ int check_incoming_acks(LLnode ** outgoing_frames_head_ptr,
     //检测损坏
     if (crc != crc16((unsigned char *)inframe, MAX_FRAME_SIZE))
     {
+        //不是自己的直接返回0
+        if (inframe->header.dst_id != sender->send_id)
+        {
+            return 0;
+        }
         char tmp[1024];
-        sprintf(tmp, "Sender_%d收到的ack或nak帧损坏: ", sender->send_id);
+        sprintf(tmp, "Sender_%d-Corrupt reply message: ", sender->send_id);
         print_frame(inframe, tmp);
         return 0;
     }
@@ -107,9 +113,9 @@ int check_incoming_acks(LLnode ** outgoing_frames_head_ptr,
         return 0;
     }
     //落入窗口内
-    if ((inframe->header.number - sender->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX <= MAX_WINDOW_SIZE - 1)
+    int bias = (inframe->header.number - sender->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX;
+    if ((inframe->header.number - sender->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX <= MAX_WINDOW_SIZE - 1 && sender->swp[inframe->header.src_id].window_flag[bias])
     {
-        int bias = (inframe->header.number - sender->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX;
         //如果是ack则把对应的帧的flag置为1
         if (inframe->header.flag == 1) {
             sender->ack_flag[inframe->header.src_id][bias] = 1;
@@ -117,8 +123,8 @@ int check_incoming_acks(LLnode ** outgoing_frames_head_ptr,
         }
         //如果收到nak帧则设置一个超时的帧，例如(1, 1)
         else if (inframe->header.flag == 2) {
-            sender->expiring_timeval[inframe->header.src_id][bias].tv_sec = 1;
-            sender->expiring_timeval[inframe->header.src_id][bias].tv_usec = 1;
+            reset_timer(sender, inframe->header.src_id, bias, 1, 1);
+            return 0;
         }
         
     }
@@ -210,6 +216,7 @@ void handle_input_cmds(Sender * sender,
         if (msg_length > FRAME_PAYLOAD_SIZE)
         {
             //Do something about messages that exceed the frame size
+
             printf("<SEND_%d>: sending messages of length greater than %d is not implemented\n", sender->send_id, MAX_FRAME_SIZE);
         }
         else
@@ -225,13 +232,18 @@ void handle_input_cmds(Sender * sender,
             outgoing_frame->header.number = (sender->swp[outgoing_cmd->dst_id].left_frame_no + index) % SEQ_MAX;
             outgoing_frame->header.flag = 0;
             outgoing_frame->crc = crc16((unsigned char *)outgoing_frame, MAX_FRAME_SIZE);
-            
-            sender->swp[outgoing_cmd->dst_id].buffer[index] = *outgoing_frame;
+            memcpy(&sender->swp[outgoing_cmd->dst_id].buffer[index], outgoing_frame, sizeof(Frame));
+            //sender->swp[outgoing_cmd->dst_id].buffer[index] = *outgoing_frame;
             struct timeval    curr_timeval;
             gettimeofday(&curr_timeval, 
                      NULL);
             sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec = curr_timeval.tv_sec;
             sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec = curr_timeval.tv_usec + 100000;
+            if (sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec >= 1000000) {
+                sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec -= 1000000;
+                sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec++;
+            }
+            //fprintf(stderr, "%.2f\n", sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec /1000 + sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec * 1000);
             sender->swp[outgoing_cmd->dst_id].window_flag[index] = 1;
             //At this point, we don't need the outgoing_cmd
             free(outgoing_cmd->message);
@@ -256,6 +268,31 @@ void handle_timedout_frames(Sender * sender,
     //    1) Iterate through the sliding window protocol information you maintain for each receiver
     //    2) Locate frames that are timed out and add them to the outgoing frames
     //    3) Update the next timeout field on the outgoing frames
+    int i, j;
+    struct timeval curr_timeval;
+    for (i = 0; i < sender->receivers; i++) {
+        for (j = 0; j < MAX_WINDOW_SIZE; j++) {
+            if (sender->expiring_timeval[i][j].tv_sec == 0 && sender->expiring_timeval[i][j].tv_usec == 0) {
+                continue;
+            }
+            else {
+                gettimeofday(&curr_timeval,  NULL);
+                //如果过时了，那么重新发送
+                if (timeval_usecdiff(&sender->expiring_timeval[i][j], &curr_timeval)) {
+                    ll_append_node(outgoing_frames_head_ptr, convert_frame_to_char(&sender->swp[i].buffer[j]));
+                    sender->expiring_timeval[i][j].tv_sec = curr_timeval.tv_sec;
+                    sender->expiring_timeval[i][j].tv_usec = curr_timeval.tv_usec + 100000;
+                    if (sender->expiring_timeval[i][j].tv_usec >= 1000000) {
+                        sender->expiring_timeval[i][j].tv_usec -= 1000000;
+                        sender->expiring_timeval[i][j].tv_sec++;
+                    }
+                    char tmp[1024];
+                    sprintf(tmp, "Sender_%d_Receiver_%d-SEQ-time_out: ", sender->send_id, i);
+                    print_frame(&sender->swp[i].buffer[j], tmp);
+                }
+            }
+        }
+    }
 }
 
 

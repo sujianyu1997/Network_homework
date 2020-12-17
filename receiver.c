@@ -30,7 +30,9 @@ void fill_outgoing_frames(LLnode ** outgoing_frames_head_ptr, Frame * inframe, u
     outgoingframe->crc = 0;
 	//添加crc校验码
 	outgoingframe->crc = crc16((unsigned char *)outgoingframe, MAX_FRAME_SIZE);
+
 	ll_append_node(outgoing_frames_head_ptr, convert_frame_to_char(outgoingframe));
+
     //接收者发送ACK帧
 	if(flag == 1)
 	{	
@@ -59,13 +61,14 @@ void receiver_window_move(Receiver * receiver, int src_id)
         }
         else {
             to_network_layer(receiver->swp[src_id].buffer[i].data, receiver->recv_id);
-            receiver->swp[src_id].window_flag[i] = 0;
         }
     }
     receiver->swp[src_id].left_frame_no = (receiver->swp[src_id].left_frame_no + i) % SEQ_MAX;
     receiver->swp[src_id].right_frame_no = (receiver->swp[src_id].right_frame_no + i) % SEQ_MAX;
     unsigned char zero = 0;
     left_loop(receiver->swp[src_id].window_flag, &zero, MAX_WINDOW_SIZE, i, sizeof(unsigned char));
+    Frame tmp_f;
+    left_loop(receiver->swp[src_id].buffer, &tmp_f, MAX_WINDOW_SIZE, i, sizeof(Frame));
     sprintf(tmp, "Receiver_%d-Sender_%d(after): ", receiver->recv_id, src_id);
     receiver_print_window(receiver, src_id, tmp);
 }
@@ -81,9 +84,18 @@ int check_incoming_msgs(LLnode ** outgoing_frames_head_ptr, Frame * inframe, Rec
     //损坏发NAK帧
     if (crc != crc16((unsigned char *)inframe, MAX_FRAME_SIZE))
     {
-        
-        
-        fprintf(stderr, "帧损坏 ");
+        //不是自己的直接返回0
+        if (inframe->header.dst_id != receiver->recv_id)
+        {
+            return 0;
+        }
+        //目的地址和起始地址损坏，不发NAK
+        if (inframe->header.src_id < 0 || inframe->header.src_id >= receiver->senders || inframe->header.dst_id < 0) {
+            return 0;
+        }
+        char tmp[1024];
+        sprintf(tmp, "Rec_%d-Corrupted message", receiver->recv_id);
+        print_frame(inframe, tmp);
         fill_outgoing_frames(outgoing_frames_head_ptr, inframe, 2);
         return 0;
     }
@@ -92,7 +104,6 @@ int check_incoming_msgs(LLnode ** outgoing_frames_head_ptr, Frame * inframe, Rec
     {
         return 0;
     }
-    
     //在窗口内的发ACK帧
     if ((inframe->header.number - receiver->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX <= MAX_WINDOW_SIZE - 1)
     {
