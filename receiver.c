@@ -27,6 +27,7 @@ void fill_outgoing_frames(LLnode ** outgoing_frames_head_ptr, Frame * inframe, u
 	outgoingframe->header.dst_id = inframe->header.src_id;
 	outgoingframe->header.number = inframe->header.number;
 	outgoingframe->header.flag = flag;
+    outgoingframe->crc = 0;
 	//添加crc校验码
 	outgoingframe->crc = crc16((unsigned char *)outgoingframe, MAX_FRAME_SIZE);
 	ll_append_node(outgoing_frames_head_ptr, convert_frame_to_char(outgoingframe));
@@ -74,12 +75,14 @@ void to_network_layer(char * str, int id)
 }
 int check_incoming_msgs(LLnode ** outgoing_frames_head_ptr, Frame * inframe, Receiver * receiver)
 {
+
     unsigned short int crc = inframe->crc;
     inframe->crc = 0;
-    print_frame(inframe, "");
     //损坏发NAK帧
     if (crc != crc16((unsigned char *)inframe, MAX_FRAME_SIZE))
     {
+        
+        
         fprintf(stderr, "帧损坏 ");
         fill_outgoing_frames(outgoing_frames_head_ptr, inframe, 2);
         return 0;
@@ -89,6 +92,7 @@ int check_incoming_msgs(LLnode ** outgoing_frames_head_ptr, Frame * inframe, Rec
     {
         return 0;
     }
+    
     //在窗口内的发ACK帧
     if ((inframe->header.number - receiver->swp[inframe->header.src_id].left_frame_no + SEQ_MAX) % SEQ_MAX <= MAX_WINDOW_SIZE - 1)
     {
@@ -121,8 +125,6 @@ void handle_incoming_msgs(Receiver * receiver,
     {
         //Pop a node off the front of the link list and update the count
         LLnode * ll_inmsg_node = ll_pop_node(&receiver->input_framelist_head);
-        
-
         //DUMMY CODE: Print the raw_char_buf
         //NOTE: You should not blindly print messages!
         //      Ask yourself: Is this message really for me?
@@ -130,6 +132,7 @@ void handle_incoming_msgs(Receiver * receiver,
         //                    Is this an old, retransmitted message?           
         char * raw_char_buf = (char *) ll_inmsg_node->value;
         Frame * inframe = convert_char_to_frame(raw_char_buf);
+        
         if (!check_incoming_msgs(outgoing_frames_head_ptr, inframe, receiver))
         {
             free(raw_char_buf);

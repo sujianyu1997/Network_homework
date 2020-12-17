@@ -216,6 +216,7 @@ void handle_input_cmds(Sender * sender,
         {
             //This is probably ONLY one step you want
             Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
+            memset(outgoing_frame, 0, MAX_FRAME_SIZE);//初始化
             strcpy(outgoing_frame->data, outgoing_cmd->message);
 
             outgoing_frame->header.data_length = msg_length;
