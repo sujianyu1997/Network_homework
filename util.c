@@ -151,7 +151,7 @@ void print_frame(Frame * frame, char * str)
 	{
 		type = "NAK";
 	}
-	fprintf(stderr, "%-36s frame_content: number=%d,src_id=%d,dst_id=%d,type=%s,data_length=%d,data=%s,crc=%x\n",
+	fprintf(stderr, "%-40s frame_content: number=%d,src_id=%d,dst_id=%d,type=%s,data_length=%d,data=%s,crc=%x\n",
           str,
           frame->header.number,
           frame->header.src_id,
@@ -164,7 +164,7 @@ void print_frame(Frame * frame, char * str)
 }
 void sender_print_window(Sender * sender, int rec_id, char * str) {
     SlidingWindow * swp = &sender->swp[rec_id];
-    fprintf(stderr, "%-36s window:[%d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s] \t", 
+    fprintf(stderr, "%-40s window:[%d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s, %d%s%s] \t", 
     str,
     swp->left_frame_no, (swp->window_flag[0] ? "*" : " "), (sender->ack_flag[rec_id][0] ? "D" : " "), 
     (swp->left_frame_no + 1) % SEQ_MAX, (swp->window_flag[1] ? "*" : " "), (sender->ack_flag[rec_id][1] ? "D" : " "), 
@@ -192,7 +192,7 @@ void sender_print_window(Sender * sender, int rec_id, char * str) {
 
 void receiver_print_window(Receiver * receiver, int send_id, char * str) {
     SlidingWindow * swp = &receiver->swp[send_id];
-    fprintf(stderr, "%-36s window:[%d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s] \n", 
+    fprintf(stderr, "%-40s window:[%d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s, %d%s] \n", 
     str,
     swp->left_frame_no, (swp->window_flag[0] ? "*" : " "),
     (swp->left_frame_no + 1) % SEQ_MAX, (swp->window_flag[1] ? "*" : " "),

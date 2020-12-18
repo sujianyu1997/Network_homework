@@ -213,50 +213,54 @@ void handle_input_cmds(Sender * sender,
         //                    Does the receiver have enough space in in it's input queue to handle this message?
         //                    Were the previous messages sent to this receiver ACTUALLY delivered to the receiver?
         int msg_length = strlen(outgoing_cmd->message);
-        if (msg_length > FRAME_PAYLOAD_SIZE)
+        if (msg_length > FRAME_PAYLOAD_SIZE - 1)
         {
             //Do something about messages that exceed the frame size
-
-            printf("<SEND_%d>: sending messages of length greater than %d is not implemented\n", sender->send_id, MAX_FRAME_SIZE);
+            Cmd * next_cmd = (Cmd*)malloc(sizeof(Cmd));
+            next_cmd->src_id = outgoing_cmd->src_id;
+            next_cmd->dst_id = outgoing_cmd->dst_id;
+            next_cmd->message = (char*)malloc((msg_length - (int)FRAME_PAYLOAD_SIZE) + 2);
+            strncpy(next_cmd->message, (outgoing_cmd->message + (int)FRAME_PAYLOAD_SIZE - 1), (msg_length - (int)FRAME_PAYLOAD_SIZE) + 2);
+            outgoing_cmd->message[FRAME_PAYLOAD_SIZE - 1] = '\0';
+            ll_append_node(&sender->input_cmdlist_head, (void *) next_cmd);
+            fprintf(stderr, "Send_%d-message too long\n", sender->send_id);     
+            //printf("<SEND_%d>: sending messages of length greater than %d is not implemented\n", sender->send_id, MAX_FRAME_SIZE);
         }
-        else
-        {
-            //This is probably ONLY one step you want
-            Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
-            memset(outgoing_frame, 0, MAX_FRAME_SIZE);//初始化
-            strcpy(outgoing_frame->data, outgoing_cmd->message);
+        //This is probably ONLY one step you want
+        Frame * outgoing_frame = (Frame *) malloc (sizeof(Frame));
+        memset(outgoing_frame, 0, MAX_FRAME_SIZE);//初始化
+        strcpy(outgoing_frame->data, outgoing_cmd->message);
 
-            outgoing_frame->header.data_length = msg_length;
-            outgoing_frame->header.dst_id = outgoing_cmd->dst_id;
-            outgoing_frame->header.src_id = outgoing_cmd->src_id;
-            outgoing_frame->header.number = (sender->swp[outgoing_cmd->dst_id].left_frame_no + index) % SEQ_MAX;
-            outgoing_frame->header.flag = 0;
-            outgoing_frame->crc = crc16((unsigned char *)outgoing_frame, MAX_FRAME_SIZE);
-            memcpy(&sender->swp[outgoing_cmd->dst_id].buffer[index], outgoing_frame, sizeof(Frame));
-            //sender->swp[outgoing_cmd->dst_id].buffer[index] = *outgoing_frame;
-            struct timeval    curr_timeval;
-            gettimeofday(&curr_timeval, 
-                     NULL);
-            sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec = curr_timeval.tv_sec;
-            sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec = curr_timeval.tv_usec + 100000;
-            if (sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec >= 1000000) {
-                sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec -= 1000000;
-                sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec++;
-            }
-            //fprintf(stderr, "%.2f\n", sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec /1000 + sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec * 1000);
-            sender->swp[outgoing_cmd->dst_id].window_flag[index] = 1;
-            //At this point, we don't need the outgoing_cmd
-            free(outgoing_cmd->message);
-            free(outgoing_cmd);
-            char tmp[1024];
-            sprintf(tmp, "Sender_%d-Receiver_%d-SEQ: ", outgoing_frame->header.src_id, outgoing_frame->header.dst_id);
-            print_frame(outgoing_frame, tmp);
-            //Convert the message to the outgoing_charbuf
-            char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
-            ll_append_node(outgoing_frames_head_ptr,
-                           outgoing_charbuf);
-            free(outgoing_frame);
+        outgoing_frame->header.data_length = strlen(outgoing_frame->data);
+        outgoing_frame->header.dst_id = outgoing_cmd->dst_id;
+        outgoing_frame->header.src_id = outgoing_cmd->src_id;
+        outgoing_frame->header.number = (sender->swp[outgoing_cmd->dst_id].left_frame_no + index) % SEQ_MAX;
+        outgoing_frame->header.flag = 0;
+        outgoing_frame->crc = crc16((unsigned char *)outgoing_frame, MAX_FRAME_SIZE);
+        memcpy(&sender->swp[outgoing_cmd->dst_id].buffer[index], outgoing_frame, sizeof(Frame));
+        //sender->swp[outgoing_cmd->dst_id].buffer[index] = *outgoing_frame;
+        struct timeval    curr_timeval;
+        gettimeofday(&curr_timeval, 
+                    NULL);
+        sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec = curr_timeval.tv_sec;
+        sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec = curr_timeval.tv_usec + 100000;
+        if (sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec >= 1000000) {
+            sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec -= 1000000;
+            sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec++;
         }
+        //fprintf(stderr, "%.2f\n", sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_usec /1000 + sender->expiring_timeval[outgoing_cmd->dst_id][index].tv_sec * 1000);
+        sender->swp[outgoing_cmd->dst_id].window_flag[index] = 1;
+        //At this point, we don't need the outgoing_cmd
+        free(outgoing_cmd->message);
+        free(outgoing_cmd);
+        char tmp[1024];
+        sprintf(tmp, "Sender_%d-Receiver_%d-SEQ: ", outgoing_frame->header.src_id, outgoing_frame->header.dst_id);
+        print_frame(outgoing_frame, tmp);
+        //Convert the message to the outgoing_charbuf
+        char * outgoing_charbuf = convert_frame_to_char(outgoing_frame);
+        ll_append_node(outgoing_frames_head_ptr,
+                        outgoing_charbuf);
+        free(outgoing_frame);
     }   
 }
 
