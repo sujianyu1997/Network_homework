@@ -93,8 +93,8 @@ typedef struct Frame_h FrameHeader;
 
 struct Frame_t //帧头5B + payload41B + crc2B = 48B
 {
-	FrameHeader header;
-    char data[FRAME_PAYLOAD_SIZE];
+	FrameHeader header;//头部结构体
+    char data[FRAME_PAYLOAD_SIZE];//帧内容
     unsigned short int crc;	//校验字段，使用CRC校验码
 };
 typedef struct Frame_t Frame;
@@ -111,36 +111,25 @@ typedef struct SWP_t SlidingWindow;
 //Receiver and sender data structures
 struct Receiver_t //接收者结构体
 {
-    //DO NOT CHANGE:
-    // 1) buffer_mutex
-    // 2) buffer_cv
-    // 3) input_framelist_head
-    // 4) recv_id
     pthread_mutex_t buffer_mutex; //linux线程互斥量
     pthread_cond_t buffer_cv; //线程条件变量
     LLnode * input_framelist_head;//待处理信息的队列
-    int recv_id;
+    int recv_id;//接收者ID
 	int senders;//一个接受者需要处理的发送者数量，因为是广播式
 	SlidingWindow * swp;//滑动窗口结构体数组
 };
 
 struct Sender_t //发送者结构体
 {
-    //DO NOT CHANGE:
-    // 1) buffer_mutex
-    // 2) buffer_cv
-    // 3) input_cmdlist_head
-    // 4) input_framelist_head
-    // 5) send_id
     pthread_mutex_t buffer_mutex; //linux线程互斥量
     pthread_cond_t buffer_cv;    //线程条件变量
     LLnode * input_cmdlist_head; //命令双向链表
     LLnode * input_framelist_head; //待发消息双向链表
-    int send_id;
+    int send_id;//发送者ID
 	int receivers; //一个发送者需要处理的者数量，因为是广播式
 	SlidingWindow * swp;//滑动窗口结构体数组
-    struct timeval (*expiring_timeval)[MAX_WINDOW_SIZE];
-    unsigned char (*ack_flag)[MAX_WINDOW_SIZE];
+    struct timeval (*expiring_timeval)[MAX_WINDOW_SIZE];//帧过期时间
+    unsigned char (*ack_flag)[MAX_WINDOW_SIZE];//帧是否被确认的标志
 };
 
 
