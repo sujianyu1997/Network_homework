@@ -38,5 +38,5 @@ echo
 
 ## Test Case 5
 echo -n "Test case 5: Sending 256 packets and expecting receivers to print them out in order: "
-(sleep 0.5; for i in `seq 0 255`; do echo "msg $i $i There are moments in life when you miss someone so much that you just want to pick them from your dreams and hug them for real! Dream what you want to dream;go where you want to go;be what you want to be,because you have only one life and one chance to do all the things you want to do."; sleep 0.1; done; sleep 1; echo "exit") | ./datalink -c 0.5 -d 0.5 -r 256 -s 256 > .output.2 2> .debug_output.2
+(sleep 0.5; for i in `seq 0 3`; do echo "msg $i $i Packet: $i"; sleep 0.1; done; sleep 1; echo "exit") | ./datalink -c 0.5 -d 0.5 -r 256 -s 256
 
